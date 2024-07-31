@@ -1,57 +1,41 @@
-
+#!/usr/bin/env node
+'use strict';
 const express = require('express');
-const authenticate = require('./src/authenticate');
 const params = require('./src/params');
 const compress = require('./src/compress');
-const fetch = require('node-fetch'); // For fetching images
-const path = require('path');
+const fetch = require('node-fetch'); // Add this for fetching images
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.enable('trust proxy');
-app.use(authenticate); // Apply authentication for all routes
 app.use(params); // Apply parameter processing for all routes
 
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
     const url = req.query.url;
     if (!url) {
         return res.status(400).send('No URL provided');
     }
 
-    fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            return response.buffer().then(buffer => {
-                console.log('Fetch Status:', response.status);
-                console.log('Content-Type:', contentType);
-                console.log('Buffer Length:', buffer.length);
-
-                req.headers['content-type'] = contentType;
-                req.query.originSize = buffer.length;
-
-                // Call the compress function
-                compress(req, res, buffer);
-            });
-        })
-        .catch(err => {
-            console.error('Error fetching or processing image:', err);
-            res.status(500).send('Error fetching or processing image');
-        });
-});
-
-app.get('/test-image', (req, res) => {
-    const imagePath = path.join(__dirname, 'path/to/your/test-image.jpg');
-    res.sendFile(imagePath, err => {
-        if (err) {
-            console.error('Error serving static image:', err);
-            res.status(500).send('Error serving image');
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    });
+
+        const contentType = response.headers.get('Content-Type');
+        const buffer = await response.buffer();
+
+        // Set headers for content type and original size
+        req.headers['Content-Type'] = contentType;
+        req.query.originSize = buffer.length;
+
+        // Compress the image
+        compress(req, res, buffer);
+    } catch (err) {
+        console.error('Error fetching or processing image:', err.message);
+        res.status(500).send('Error fetching or processing image');
+    }
 });
 
 app.get('/favicon.ico', (req, res) => res.status(204).end());
