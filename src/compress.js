@@ -1,43 +1,71 @@
-#!/usr/bin/env node
-'use strict';
-const express = require('express');
-const params = require('./src/params');
-const compress = require('./src/compress');
-const fetch = require('node-fetch'); // Add this for fetching images
+const sharp = require('sharp');
 
-const app = express();
-const PORT = process.env.PORT || 8080;
+function redirect(req, res) {
+    if (res.headersSent) {
+        return;
+    }
+    res.setHeader('content-length', 0);
+    res.removeHeader('cache-control');
+    res.removeHeader('expires');
+    res.removeHeader('date');
+    res.removeHeader('etag');
+    res.setHeader('location', encodeURI(req.params.url));
+    res.status(302).end();
+}
 
-app.enable('trust proxy');
-app.use(params); // Apply parameter processing for all routes
+function bypass(req, res, buffer) {
+    res.setHeader('x-proxy-bypass', 1);
+    res.setHeader('content-length', buffer.length);
+    res.status(200).send(buffer);
+}
 
-app.get('/', async (req, res) => {
-    const url = req.query.url;
-    if (!url) {
-        return res.status(400).send('No URL provided');
+function compress(req, res, input) {
+    const format = req.params.webp ? 'webp' : 'jpeg';
+
+    if (shouldCompress(req)) {
+        sharp(input)
+            .grayscale(req.params.grayscale)
+            .toFormat(format, {
+                quality: req.params.quality,
+                progressive: true,
+                optimizeScans: true
+            })
+            .toBuffer((err, output, info) => {
+                if (err || !info || res.headersSent) {
+                    return redirect(req, res);
+                }
+
+                res.setHeader('content-type', `image/${format}`);
+                res.setHeader('content-length', info.size);
+                res.setHeader('x-original-size', req.params.originSize);
+                res.setHeader('x-bytes-saved', req.params.originSize - info.size);
+                res.status(200).send(output);
+            });
+    } else {
+        bypass(req, res, input);
+    }
+}
+
+function shouldCompress(req) {
+    const MIN_COMPRESS_LENGTH = 512; // Adjust the minimum compress length as desired
+    const MIN_TRANSPARENT_COMPRESS_LENGTH = MIN_COMPRESS_LENGTH * 100;
+
+    const { originType, originSize, webp } = req.params;
+
+    if (!originType.startsWith('image')) {
+        return false;
+    }
+    if (originSize === 0) {
+        return false;
+    }
+    if (webp && originSize < MIN_COMPRESS_LENGTH) {
+        return false;
+    }
+    if (!webp && (originType.endsWith('png') || originType.endsWith('gif')) && originSize < MIN_TRANSPARENT_COMPRESS_LENGTH) {
+        return false;
     }
 
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+    return true;
+}
 
-        const contentType = response.headers.get('Content-Type');
-        const buffer = await response.buffer();
-
-        // Set headers for content type and original size
-        req.headers['Content-Type'] = contentType;
-        req.query.originSize = buffer.length;
-
-        // Compress the image
-        compress(req, res, buffer);
-    } catch (err) {
-        console.error('Error fetching or processing image:', err.message);
-        res.status(500).send('Error fetching or processing image');
-    }
-});
-
-app.get('/favicon.ico', (req, res) => res.status(204).end());
-
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+module.exports = compress;
