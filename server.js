@@ -15,8 +15,9 @@ app.get('/', (req, res) => {
     const url = req.params.url; // Use processed URL from params middleware
 
     // Fetch the image from the URL
-    request.get({
+    request({
         uri: url, // Specify the URL with 'uri'
+        method: 'GET',
         encoding: null, // Get the response as a Buffer
         headers: {
             'User-Agent': 'MyApp/1.0', // Customize headers if needed
@@ -24,9 +25,14 @@ app.get('/', (req, res) => {
             // Add other headers if required
         }
     }, (err, response, buffer) => {
-        if (err || response.statusCode >= 400) {
-            console.error('Error fetching image:', err || `Status code: ${response.statusCode}`);
+        if (err) {
+            console.error('Error fetching image:', err);
             return res.status(500).send('Error fetching image');
+        }
+
+        if (response.statusCode >= 400) {
+            console.error('Error fetching image: Status code', response.statusCode);
+            return res.status(response.statusCode).send('Error fetching image');
         }
 
         const contentType = response.headers['content-type'] || '';
