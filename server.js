@@ -15,7 +15,8 @@ app.get('/', (req, res) => {
     const url = req.params.url; // Use processed URL from params middleware
 
     // Fetch the image from the URL
-    request.get(url, {
+    request.get({
+        uri: url, // Specify the URL with 'uri'
         encoding: null, // Get the response as a Buffer
         headers: {
             'User-Agent': 'MyApp/1.0', // Customize headers if needed
