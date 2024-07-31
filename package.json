@@ -10,7 +10,6 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "basic-auth": "^2.0.1",
     "express": "4.17.1",
     "node-fetch": "^2.6.1",
     "sharp": "^0.28.2"
