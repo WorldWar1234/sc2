@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 'use strict';
 const express = require('express');
-const authenticate = require('./src/authenticate');
 const params = require('./src/params');
 const compress = require('./src/compress');
-const fetch = require('node-fetch');
+const fetch = require('node-fetch'); // Add this for fetching images
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.enable('trust proxy');
-app.use(authenticate); // Apply authentication for all routes
 app.use(params); // Apply parameter processing for all routes
 
 app.get('/', async (req, res) => {
