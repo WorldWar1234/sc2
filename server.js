@@ -3,8 +3,8 @@
 
 const express = require('express');
 const fetch = require('node-fetch');
-const params = require('./src/params');
 const compress = require('./src/compress');
+const params = require('./src/params');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -14,7 +14,7 @@ app.use(params); // Apply parameter processing for all routes
 app.get('/', async (req, res) => {
     try {
         const response = await fetch(req.params.url);
-        const contentType = response.headers.get('content-type');
+        const contentType = response.headers.get('content-type') || '';
         const buffer = await response.buffer();
         
         console.log(`Fetch Status: ${response.status}`);
@@ -25,8 +25,8 @@ app.get('/', async (req, res) => {
             return res.status(response.status).send('Error fetching image');
         }
 
-        req.headers['content-type'] = contentType;
-        req.query.originSize = buffer.length;
+        req.params.originType = origin.headers['content-type'] || '';  // Set originType in params
+        req.params.originSize = buffer.length;  // Set originSize in params
         
         compress(req, res, buffer);
     } catch (err) {
