@@ -3,18 +3,16 @@
 const express = require('express');
 const request = require('request');
 const compress = require('./src/compress');
+const params = require('./src/params');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.enable('trust proxy');
+// Apply the params middleware to process query parameters
+app.use(params);
 
 app.get('/', (req, res) => {
-    const url = req.query.url; // Ensure 'url' is passed as a query parameter
-
-    if (!url) {
-        return res.status(400).send('Missing URL parameter');
-    }
+    const url = req.params.url; // Use processed URL from params middleware
 
     // Fetch the image from the URL
     request.get(url, {
