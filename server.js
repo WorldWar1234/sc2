@@ -25,7 +25,7 @@ app.get('/', (req, res) => {
                 'user-agent': 'Bandwidth-Hero Compressor',
                 'x-forwarded-for': req.headers['x-forwarded-for'] || req.ip,
                 via: '1.1 bandwidth-hero',
-                'Accept': 'image/*' // Add the 'Accept' header to request
+                // Add the 'Accept' header to request
             },
             timeout: 10000,
             maxRedirects: 5,
