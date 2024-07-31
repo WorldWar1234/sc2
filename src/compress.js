@@ -1,37 +1,45 @@
-const sharp = require('sharp');
-const redirect = require('./redirect');
+#!/usr/bin/env node
+'use strict';
+const express = require('express');
+const authenticate = require('./src/authenticate');
+const params = require('./src/params');
+const compress = require('./src/compress');
+const fetch = require('node-fetch');
 
-function compress(req, res, input) {
-    // Determine the output format based on query parameters
-    const format = req.query.webp ? 'webp' : 'jpeg';
+const app = express();
+const PORT = process.env.PORT || 8080;
 
-    sharp(input)
-        .grayscale(req.query.grayscale === 'true') // Ensure proper boolean handling
-        .toFormat(format, {
-            quality: parseInt(req.query.quality, 10) || 40, // Use default quality if not provided
-            progressive: true,
-            optimizeScans: true
-        })
-        .toBuffer((err, output, info) => {
-            if (err) {
-                console.error('Error processing image:', err);
-                return redirect(req, res);
-            }
+app.enable('trust proxy');
+app.use(authenticate); // Apply authentication for all routes
+app.use(params); // Apply parameter processing for all routes
 
-            if (!info) {
-                console.error('No image info available');
-                return redirect(req, res);
-            }
+app.get('/', async (req, res) => {
+    const url = req.query.url;
+    if (!url) {
+        return res.status(400).send('No URL provided');
+    }
 
-            // Set appropriate headers
-            res.setHeader('Content-Type', `image/${format}`);
-            res.setHeader('Content-Length', info.size);
-            res.setHeader('X-Original-Size', req.query.originSize);
-            res.setHeader('X-Bytes-Saved', req.query.originSize - info.size);
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-            // Send the processed image
-            res.status(200).send(output);
-        });
-}
+        const contentType = response.headers.get('Content-Type');
+        const buffer = await response.buffer();
 
-module.exports = compress;
+        // Set headers for content type and original size
+        req.headers['Content-Type'] = contentType;
+        req.query.originSize = buffer.length;
+
+        // Compress the image
+        compress(req, res, buffer);
+    } catch (err) {
+        console.error('Error fetching or processing image:', err.message);
+        res.status(500).send('Error fetching or processing image');
+    }
+});
+
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
+app.listen(PORT, () => console.log(`Listening on ${PORT}`));
